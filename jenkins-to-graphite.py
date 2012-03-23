@@ -40,7 +40,8 @@ class JenkinsServer(object):
         """Creates a urllib2 opener with basic auth for talking to jenkins"""
         if self._opener is None:
             opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
-            opener.addheaders = [(("Authorization", "Basic " + base64.encodestring("%s:%s" % (self.user, self.password))))]
+            if self.user or self.password:
+              opener.addheaders = [(("Authorization", "Basic " + base64.encodestring("%s:%s" % (self.user, self.password))))]
             urllib2.install_opener(opener)
             self._opener = opener
 
