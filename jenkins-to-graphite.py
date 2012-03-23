@@ -18,7 +18,6 @@
 #   limitations under the License.
 
 import base64
-import json
 import logging
 import optparse
 import os
@@ -26,6 +25,19 @@ import sys
 import socket
 import time
 import urllib2
+
+try:
+    # this should be available in any python 2.6 or newer
+    import json
+except:
+  try:
+      # simplejson is a good replacement on 2.5 installs
+      import simplejson as json
+  except:
+      print "FATAL ERROR: can't find any json library for python"
+      print "Please install simplejson, json, or upgrade to python 2.6+"
+      sys.exit(1)
+#end json import
 
 class JenkinsServer(object):
     def __init__(self, base_url, user, password):
@@ -41,7 +53,7 @@ class JenkinsServer(object):
         if self._opener is None:
             opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
             if self.user or self.password:
-              opener.addheaders = [(("Authorization", "Basic " + base64.encodestring("%s:%s" % (self.user, self.password))))]
+                opener.addheaders = [(("Authorization", "Basic " + base64.encodestring("%s:%s" % (self.user, self.password))))]
             urllib2.install_opener(opener)
             self._opener = opener
 
@@ -86,7 +98,7 @@ class GraphiteServer(object):
             s.sendall(self._data_as_msg())
 #            print self._data_as_msg()
             s.close()
-        except Exception as e:
+        except Exception, e:
             logging.warn("Unable to send msg to graphite: %s" % (e,))
             return False
 
@@ -136,15 +148,15 @@ def main():
                       executor_info.get("busyExecutors", 0))
 
     if opts.jobs:
-      builds_info = jenkins.get_data("/view/%s" % opts.jobs)
-      jobs = builds_info.get("jobs", [])
-      ok = [j for j in jobs if j.get("color", 0) == "blue"]
-      fail = [j for j in jobs if j.get("color", 0) == "red"]
-      warn = [j for j in jobs if j.get("color", 0) == "yellow"]
-      graphite.add_data("jobs.total", len(jobs))
-      graphite.add_data("jobs.ok", len(ok))
-      graphite.add_data("jobs.fail", len(fail))
-      graphite.add_data("jobs.warn", len(warn))
+        builds_info = jenkins.get_data("/view/%s" % opts.jobs)
+        jobs = builds_info.get("jobs", [])
+        ok = [j for j in jobs if j.get("color", 0) == "blue"]
+        fail = [j for j in jobs if j.get("color", 0) == "red"]
+        warn = [j for j in jobs if j.get("color", 0) == "yellow"]
+        graphite.add_data("jobs.total", len(jobs))
+        graphite.add_data("jobs.ok", len(ok))
+        graphite.add_data("jobs.fail", len(fail))
+        graphite.add_data("jobs.warn", len(warn))
     #end if
 
     graphite.send()
