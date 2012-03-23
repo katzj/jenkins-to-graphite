@@ -105,6 +105,8 @@ def parse_args():
     parser.add_option("", "--jenkins-password",
                       help="Password for authenticating with jenkins")
 
+    parser.add_option("", "--jobs",
+                      help="Jobs view to monitor for success/failure")
     parser.add_option("", "--prefix", default="jenkins",
                       help="Graphite metric prefix")
 
@@ -132,6 +134,18 @@ def main():
     graphite.add_data("executors.free",
                       executor_info.get("totalExecutors", 0) -
                       executor_info.get("busyExecutors", 0))
+
+    if opts.jobs:
+      builds_info = jenkins.get_data("/view/%s" % opts.jobs)
+      jobs = builds_info.get("jobs", [])
+      ok = [j for j in jobs if j.get("color", 0) == "blue"]
+      fail = [j for j in jobs if j.get("color", 0) == "red"]
+      warn = [j for j in jobs if j.get("color", 0) == "yellow"]
+      graphite.add_data("jobs.total", len(jobs))
+      graphite.add_data("jobs.ok", len(ok))
+      graphite.add_data("jobs.fail", len(fail))
+      graphite.add_data("jobs.warn", len(warn))
+    #end if
 
     graphite.send()
 
