@@ -62,14 +62,15 @@ class JenkinsServer(object):
         return data
 
 class GraphiteServer(object):
-    def __init__(self, server, port):
+    def __init__(self, server, port, prefix):
         self.server = server
         self.port = int(port)
+        self.prefix = prefix.rstrip('.')
 
         self.data = {}
 
     def add_data(self, key, value):
-        self.data[key] = value
+        self.data["%s.%s" %( self.prefix, key)] = value
 
     def _data_as_msg(self):
         msg = ""
@@ -104,6 +105,9 @@ def parse_args():
     parser.add_option("", "--jenkins-password",
                       help="Password for authenticating with jenkins")
 
+    parser.add_option("", "--prefix", default="jenkins",
+                      help="Graphite metric prefix")
+
     (opts, args) = parser.parse_args()
 
     if not opts.graphite_server or not opts.jenkins_url:
@@ -116,15 +120,16 @@ def main():
     opts = parse_args()
     jenkins = JenkinsServer(opts.jenkins_url, opts.jenkins_user,
                             opts.jenkins_password)
-    graphite = GraphiteServer(opts.graphite_server, opts.graphite_port)
+    graphite = GraphiteServer(opts.graphite_server, opts.graphite_port,
+                              opts.prefix)
 
     queue_info = jenkins.get_data("/queue")
     executor_info = jenkins.get_data("/computer")
 
-    graphite.add_data("jenkins.build_queue", len(queue_info.get("items", [])))
-    graphite.add_data("jenkins.total_executors", executor_info.get("totalExecutors", 0))
-    graphite.add_data("jenkins.busy_executors", executor_info.get("busyExecutors", 0))
-    graphite.add_data("jenkins.free_executors",
+    graphite.add_data("queue.size", len(queue_info.get("items", [])))
+    graphite.add_data("executors.total", executor_info.get("totalExecutors", 0))
+    graphite.add_data("executors.busy", executor_info.get("busyExecutors", 0))
+    graphite.add_data("executors.free",
                       executor_info.get("totalExecutors", 0) -
                       executor_info.get("busyExecutors", 0))
 
