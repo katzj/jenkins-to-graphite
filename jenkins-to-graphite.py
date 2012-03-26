@@ -18,7 +18,6 @@
 #   limitations under the License.
 
 import base64
-import json
 import logging
 import optparse
 import os
@@ -26,6 +25,19 @@ import sys
 import socket
 import time
 import urllib2
+
+try:
+    # this should be available in any python 2.6 or newer
+    import json
+except:
+  try:
+      # simplejson is a good replacement on 2.5 installs
+      import simplejson as json
+  except:
+      print "FATAL ERROR: can't find any json library for python"
+      print "Please install simplejson, json, or upgrade to python 2.6+"
+      sys.exit(1)
+#end json import
 
 class JenkinsServer(object):
     def __init__(self, base_url, user, password):
@@ -40,7 +52,8 @@ class JenkinsServer(object):
         """Creates a urllib2 opener with basic auth for talking to jenkins"""
         if self._opener is None:
             opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
-            opener.addheaders = [(("Authorization", "Basic " + base64.encodestring("%s:%s" % (self.user, self.password))))]
+            if self.user or self.password:
+                opener.addheaders = [(("Authorization", "Basic " + base64.encodestring("%s:%s" % (self.user, self.password))))]
             urllib2.install_opener(opener)
             self._opener = opener
 
@@ -61,14 +74,15 @@ class JenkinsServer(object):
         return data
 
 class GraphiteServer(object):
-    def __init__(self, server, port):
+    def __init__(self, server, port, prefix):
         self.server = server
         self.port = int(port)
+        self.prefix = prefix.rstrip('.')
 
         self.data = {}
 
     def add_data(self, key, value):
-        self.data[key] = value
+        self.data["%s.%s" %( self.prefix, key)] = value
 
     def _data_as_msg(self):
         msg = ""
@@ -84,7 +98,7 @@ class GraphiteServer(object):
             s.sendall(self._data_as_msg())
 #            print self._data_as_msg()
             s.close()
-        except Exception as e:
+        except Exception, e:
             logging.warn("Unable to send msg to graphite: %s" % (e,))
             return False
 
@@ -103,6 +117,11 @@ def parse_args():
     parser.add_option("", "--jenkins-password",
                       help="Password for authenticating with jenkins")
 
+    parser.add_option("", "--jobs",
+                      help="Jobs view to monitor for success/failure")
+    parser.add_option("", "--prefix", default="jenkins",
+                      help="Graphite metric prefix")
+
     (opts, args) = parser.parse_args()
 
     if not opts.graphite_server or not opts.jenkins_url:
@@ -115,17 +134,30 @@ def main():
     opts = parse_args()
     jenkins = JenkinsServer(opts.jenkins_url, opts.jenkins_user,
                             opts.jenkins_password)
-    graphite = GraphiteServer(opts.graphite_server, opts.graphite_port)
+    graphite = GraphiteServer(opts.graphite_server, opts.graphite_port,
+                              opts.prefix)
 
     queue_info = jenkins.get_data("/queue")
     executor_info = jenkins.get_data("/computer")
 
-    graphite.add_data("jenkins.build_queue", len(queue_info.get("items", [])))
-    graphite.add_data("jenkins.total_executors", executor_info.get("totalExecutors", 0))
-    graphite.add_data("jenkins.busy_executors", executor_info.get("busyExecutors", 0))
-    graphite.add_data("jenkins.free_executors",
+    graphite.add_data("queue.size", len(queue_info.get("items", [])))
+    graphite.add_data("executors.total", executor_info.get("totalExecutors", 0))
+    graphite.add_data("executors.busy", executor_info.get("busyExecutors", 0))
+    graphite.add_data("executors.free",
                       executor_info.get("totalExecutors", 0) -
                       executor_info.get("busyExecutors", 0))
+
+    if opts.jobs:
+        builds_info = jenkins.get_data("/view/%s" % opts.jobs)
+        jobs = builds_info.get("jobs", [])
+        ok = [j for j in jobs if j.get("color", 0) == "blue"]
+        fail = [j for j in jobs if j.get("color", 0) == "red"]
+        warn = [j for j in jobs if j.get("color", 0) == "yellow"]
+        graphite.add_data("jobs.total", len(jobs))
+        graphite.add_data("jobs.ok", len(ok))
+        graphite.add_data("jobs.fail", len(fail))
+        graphite.add_data("jobs.warn", len(warn))
+    #end if
 
     graphite.send()
 
