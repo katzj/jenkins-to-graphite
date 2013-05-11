@@ -1,0 +1,3 @@
+[pep8]
+# Ignore 'line too long'
+ignore = E501
