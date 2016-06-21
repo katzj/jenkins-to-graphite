@@ -113,22 +113,21 @@ class GraphiteServer(object):
 def parse_args():
     parser = optparse.OptionParser()
     parser.add_option("", "--graphite-server",
-                      help="Host name of the server running graphite")
+                      help="Host name of the server running Graphite")
     parser.add_option("", "--graphite-port",
                       default="2003")
     parser.add_option("", "--jenkins-url",
-                      help="Base url of your jenkins server (ex http://jenkins.example.com")
+                      help="Base URL of your Jenkins server (ex http://jenkins.example.com")
     parser.add_option("", "--jenkins-user",
-                      help="User to authenticate with for jenkins")
+                      help="User for authenticating to Jenkins")
     parser.add_option("", "--jenkins-password",
-                      help="Password for authenticating with jenkins")
-
+                      help="Password for authenticating to Jenkins")
     parser.add_option("", "--jobs",
                       help="Jobs view to monitor for success/failure")
     parser.add_option("", "--prefix", default="jenkins",
                       help="Graphite metric prefix")
     parser.add_option("", "--label", action="append", dest="labels",
-                      help="Fetch stats applicable to this node label. Can bee applied multiple times for monitoring more labels.")
+                      help="Fetch stats applicable to this node label. Can be applied multiple times for monitoring more labels.")
 
     (opts, args) = parser.parse_args()
 
